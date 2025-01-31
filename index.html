@@ -292,11 +292,12 @@
             if (document.getElementById('dimensionOption').value === 'cropped') {
                 const width = Math.abs(endX - startX);
                 const height = Math.abs(endY - startY);
-                const diagonal = Math.sqrt(width * width + height * height);
-                canvas.width = diagonal;
-                canvas.height = diagonal;
+                canvas.width = width;
+                canvas.height = height;
                 ctx.save();
-                ctx.translate(diagonal/2, diagonal/2);
+                const offsetX = (width / 2) - centerX;
+                const offsetY = (height / 2) - centerY;
+                ctx.translate(width / 2, height / 2);
                 ctx.rotate(rotationAngle);
                 ctx.translate(-centerX, -centerY);
                 ctx.drawImage(tempCanvas, 0, 0);
