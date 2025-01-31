@@ -7,10 +7,17 @@
             max-width: 800px;
             margin: 20px auto;
             text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         #preview {
             border: 1px solid #ccc;
             margin: 20px 0;
+            max-width: 100%;
+            max-height: 70vh;
+            width: auto;
+            height: auto;
         }
         .toolbar {
             margin: 10px 0;
@@ -64,6 +71,12 @@
         let originalWidth, originalHeight;
         let undoHistory = [];
         let redoHistory = [];
+        function getScaleX() {
+            return canvas.width / canvas.clientWidth;
+        }
+        function getScaleY() {
+            return canvas.height / canvas.clientHeight;
+        }
         function setShape(shape) {
             cropShape = shape;
         }
@@ -73,13 +86,14 @@
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
+                    // Set canvas to original image dimensions
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     currentImage = img;
                     originalImage = img;
-                    originalWidth = img.width;
-                    originalHeight = img.height;
+                    originalWidth = img.naturalWidth;
+                    originalHeight = img.naturalHeight;
                     undoHistory = [canvas.toDataURL()];
                     redoHistory = [];
                 };
@@ -88,14 +102,21 @@
             reader.readAsDataURL(file);
         });
         canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = getScaleX();
+            const scaleY = getScaleY();
             isDragging = true;
-            startX = e.offsetX;
-            startY = e.offsetY;
+            startX = (e.clientX - rect.left) * scaleX;
+            startY = (e.clientY - rect.top) * scaleY;
         });
         canvas.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            endX = e.offsetX;
-            endY = e.offsetY;
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = getScaleX();
+            const scaleY = getScaleY();
+            
+            endX = (e.clientX - rect.left) * scaleX;
+            endY = (e.clientY - rect.top) * scaleY;
             drawSelection();
         });
         canvas.addEventListener('mouseup', () => {
@@ -119,6 +140,8 @@
             if (!currentImage) return;
             undoHistory.push(canvas.toDataURL());
             redoHistory = [];
+            const scaleX = getScaleX();
+            const scaleY = getScaleY();
             const x = Math.min(startX, endX);
             const y = Math.min(startY, endY);
             const width = Math.abs(endX - startX);
@@ -130,7 +153,6 @@
             if (dimensionOption === 'original') {
                 canvas.width = originalWidth;
                 canvas.height = originalHeight;
-                const ctx = canvas.getContext('2d');
                 if (mergeMode === 'replace') {
                     ctx.drawImage(originalImage, 0, 0);
                 } else {
@@ -183,8 +205,7 @@
             if (undoHistory.length > 1) {
                 const currentState = undoHistory.pop();
                 redoHistory.push(currentState);
-                const prevState = undoHistory[undoHistory.length - 1];
-                restoreState(prevState);
+                restoreState(undoHistory[undoHistory.length - 1]);
             }
         }
         function redo() {
@@ -197,8 +218,8 @@
         function restoreState(dataURL) {
             const img = new Image();
             img.onload = function() {
-                canvas.width = img.width;
-                canvas.height = img.height;
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
                 ctx.drawImage(img, 0, 0);
                 currentImage = img;
             };
