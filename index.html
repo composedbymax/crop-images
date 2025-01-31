@@ -57,6 +57,7 @@
         let ctx = canvas.getContext('2d');
         let currentImage = null;
         let originalImage = null;
+        let isFirstCrop = true;
         let cropShape = 'square';
         let isDragging = false;
         let startX, startY, endX, endY;
@@ -165,6 +166,11 @@
             }
             currentImage = new Image();
             currentImage.src = canvas.toDataURL();
+            if (isFirstCrop) {
+                document.getElementById('cropMode').value = 'remove';
+                document.getElementById('mergeMode').value = 'add';
+                isFirstCrop = false;
+            }
         }
         function downloadImage() {
             if (!currentImage) return;
