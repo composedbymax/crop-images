@@ -20,29 +20,24 @@
             margin: 0 5px;
             cursor: pointer;
         }
-        .shape-selector {
+        .controls {
             margin-bottom: 10px;
-        }
-        .download-options {
-            margin-top: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <input type="file" id="imageInput" accept="image/*">
-        <div class="toolbar">
-            <div class="shape-selector">
+        <div class="controls">
+            <div class="toolbar">
                 <button onclick="setShape('square')">Square</button>
                 <button onclick="setShape('circle')">Circle</button>
-            </div>
-            <button onclick="cropImage()">Crop</button>
-            <div class="download-options">
-                <button onclick="downloadImage()">Download</button>
                 <select id="dimensionOption">
                     <option value="original">Original Dimensions</option>
                     <option value="cropped">Cropped Dimensions</option>
                 </select>
+                <button onclick="cropImage()">Crop</button>
+                <button onclick="downloadImage()">Download</button>
             </div>
         </div>
         <canvas id="preview"></canvas>
@@ -51,15 +46,17 @@
         let canvas = document.getElementById('preview');
         let ctx = canvas.getContext('2d');
         let currentImage = null;
+        let originalImage = null;
         let cropShape = 'square';
         let isDragging = false;
         let startX, startY, endX, endY;
+        let originalWidth, originalHeight;
         function setShape(shape) {
             cropShape = shape;
         }
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
-            const reader = new FileReader();
+            const reader = new FileReader(); 
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
@@ -67,6 +64,9 @@
                     canvas.height = img.height;
                     ctx.drawImage(img, 0, 0);
                     currentImage = img;
+                    originalImage = img;
+                    originalWidth = img.width;
+                    originalHeight = img.height;
                 };
                 img.src = event.target.result;
             };
@@ -88,7 +88,7 @@
         });
         function drawSelection() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(currentImage, 0, 0);
+            ctx.drawImage(currentImage, 0, 0); 
             ctx.beginPath();
             if (cropShape === 'square') {
                 ctx.rect(startX, startY, endX - startX, endY - startY);
@@ -102,53 +102,52 @@
         }
         function cropImage() {
             if (!currentImage) return;
-            const x = startX;
-            const y = startY;
-            const width = endX - startX;
-            const height = endY - startY;
+            const x = Math.min(startX, endX);
+            const y = Math.min(startY, endY);
+            const width = Math.abs(endX - startX);
+            const height = Math.abs(endY - startY);
             const radius = Math.sqrt(width ** 2 + height ** 2);
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            if (cropShape === 'square') {
-                tempCanvas.width = Math.abs(width);
-                tempCanvas.height = Math.abs(height);
-                tempCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+            const dimensionOption = document.getElementById('dimensionOption').value;
+            if (dimensionOption === 'original') {
+                canvas.width = originalWidth;
+                canvas.height = originalHeight;
+                ctx.drawImage(originalImage, 0, 0);
+                ctx.globalCompositeOperation = 'destination-in';
+                ctx.beginPath();
+                if (cropShape === 'square') {
+                    ctx.rect(x, y, width, height);
+                } else {
+                    ctx.arc(startX, startY, radius, 0, Math.PI * 2);
+                }
+                ctx.fill();
+                ctx.globalCompositeOperation = 'source-over';
             } else {
-                tempCanvas.width = radius * 2;
-                tempCanvas.height = radius * 2;
-                tempCtx.save();
-                tempCtx.beginPath();
-                tempCtx.arc(radius, radius, radius, 0, Math.PI * 2);
-                tempCtx.clip();
-                tempCtx.drawImage(currentImage, x - radius, y - radius);
-                tempCtx.restore();
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                if (cropShape === 'square') {
+                    tempCanvas.width = width;
+                    tempCanvas.height = height;
+                    tempCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+                } else {
+                    tempCanvas.width = radius * 2;
+                    tempCanvas.height = radius * 2;
+                    tempCtx.beginPath();
+                    tempCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+                    tempCtx.clip();
+                    tempCtx.drawImage(currentImage, startX - radius, startY - radius);
+                }
+                canvas.width = tempCanvas.width;
+                canvas.height = tempCanvas.height;
+                ctx.drawImage(tempCanvas, 0, 0);
             }
-            canvas.width = tempCanvas.width;
-            canvas.height = tempCanvas.height;
-            ctx.drawImage(tempCanvas, 0, 0);
             currentImage = new Image();
             currentImage.src = canvas.toDataURL();
         }
         function downloadImage() {
             if (!currentImage) return;
-            const option = document.getElementById('dimensionOption').value;
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            if (option === 'original') {
-                tempCanvas.width = currentImage.width;
-                tempCanvas.height = currentImage.height;
-                tempCtx.drawImage(canvas, 
-                    (currentImage.width - canvas.width) / 2,
-                    (currentImage.height - canvas.height) / 2
-                );
-            } else {
-                tempCanvas.width = canvas.width;
-                tempCanvas.height = canvas.height;
-                tempCtx.drawImage(canvas, 0, 0);
-            }
             const link = document.createElement('a');
             link.download = 'cropped-image.png';
-            link.href = tempCanvas.toDataURL();
+            link.href = canvas.toDataURL();
             link.click();
         }
     </script>
