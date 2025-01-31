@@ -5,7 +5,7 @@
     <style>
         .container {
             max-width: 800px;
-            margin: 20px auto;
+            margin: 0 auto;
             text-align: center;
         }
         #preview {
@@ -38,6 +38,8 @@
                 </select>
                 <button onclick="cropImage()">Crop</button>
                 <button onclick="downloadImage()">Download</button>
+                <button onclick="undo()">Undo</button>
+                <button onclick="redo()">Redo</button>
             </div>
         </div>
         <canvas id="preview"></canvas>
@@ -51,12 +53,14 @@
         let isDragging = false;
         let startX, startY, endX, endY;
         let originalWidth, originalHeight;
+        let undoHistory = [];
+        let redoHistory = [];
         function setShape(shape) {
             cropShape = shape;
         }
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
-            const reader = new FileReader(); 
+            const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
@@ -67,6 +71,8 @@
                     originalImage = img;
                     originalWidth = img.width;
                     originalHeight = img.height;
+                    undoHistory = [canvas.toDataURL()];
+                    redoHistory = [];
                 };
                 img.src = event.target.result;
             };
@@ -102,6 +108,8 @@
         }
         function cropImage() {
             if (!currentImage) return;
+            undoHistory.push(canvas.toDataURL());
+            redoHistory = [];
             const x = Math.min(startX, endX);
             const y = Math.min(startY, endY);
             const width = Math.abs(endX - startX);
@@ -149,6 +157,31 @@
             link.download = 'cropped-image.png';
             link.href = canvas.toDataURL();
             link.click();
+        }
+        function undo() {
+            if (undoHistory.length > 1) {
+                const currentState = undoHistory.pop();
+                redoHistory.push(currentState);
+                const prevState = undoHistory[undoHistory.length - 1];
+                restoreState(prevState);
+            }
+        }
+        function redo() {
+            if (redoHistory.length > 0) {
+                const nextState = redoHistory.pop();
+                undoHistory.push(nextState);
+                restoreState(nextState);
+            }
+        }
+        function restoreState(dataURL) {
+            const img = new Image();
+            img.onload = function() {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                currentImage = img;
+            };
+            img.src = dataURL;
         }
     </script>
 </body>
