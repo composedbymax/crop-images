@@ -115,7 +115,7 @@
             const centerY = (startY + endY) / 2;
             const width = endX - startX;
             const height = endY - startY;
-            const radius = Math.sqrt(width * width + height * height) / 2;
+            const radius = Math.sqrt(width * width + height * height) / 2 * 0.6;
             rotationHandleX = centerX + Math.sin(rotationAngle) * radius;
             rotationHandleY = centerY - Math.cos(rotationAngle) * radius;
         }
@@ -177,7 +177,6 @@
             const scaleY = getScaleY();
             const mouseX = (e.clientX - rect.left) * scaleX;
             const mouseY = (e.clientY - rect.top) * scaleY;
-
             if (isRotating) {
                 const centerX = (startX + endX) / 2;
                 const centerY = (startY + endY) / 2;
