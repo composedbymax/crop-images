@@ -18,6 +18,7 @@
             max-height: 70vh;
             width: auto;
             height: auto;
+            cursor: crosshair;
         }
         .toolbar {
             margin: 10px 0;
@@ -29,6 +30,14 @@
         }
         .controls {
             margin-bottom: 10px;
+        }
+        canvas {
+            background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),
+            linear-gradient(-45deg, #ddd 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #ddd 75%),
+            linear-gradient(-45deg, transparent 75%, #ddd 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
     </style>
 </head>
@@ -67,10 +76,13 @@
         let isFirstCrop = true;
         let cropShape = 'square';
         let isDragging = false;
+        let isMovingSelection = false;
         let startX, startY, endX, endY;
         let originalWidth, originalHeight;
         let undoHistory = [];
         let redoHistory = [];
+        let dragOffsetX, dragOffsetY;
+        let handleRadius = 5;
         function getScaleX() {
             return canvas.width / canvas.clientWidth;
         }
@@ -80,13 +92,18 @@
         function setShape(shape) {
             cropShape = shape;
         }
+        function isInsideHandle(x, y) {
+            const centerX = (startX + endX) / 2;
+            const centerY = (startY + endY) / 2;
+            const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+            return distance <= handleRadius;
+        }
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
-                    // Set canvas to original image dimensions
                     canvas.width = img.naturalWidth;
                     canvas.height = img.naturalHeight;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -105,26 +122,56 @@
             const rect = canvas.getBoundingClientRect();
             const scaleX = getScaleX();
             const scaleY = getScaleY();
-            isDragging = true;
-            startX = (e.clientX - rect.left) * scaleX;
-            startY = (e.clientY - rect.top) * scaleY;
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+
+            if (isInsideHandle(mouseX, mouseY)) {
+                isMovingSelection = true;
+                dragOffsetX = mouseX - ((startX + endX) / 2);
+                dragOffsetY = mouseY - ((startY + endY) / 2);
+                canvas.style.cursor = 'move';
+            } else {
+                isDragging = true;
+                startX = mouseX;
+                startY = mouseY;
+                endX = mouseX;
+                endY = mouseY;
+            }
         });
         canvas.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
             const rect = canvas.getBoundingClientRect();
             const scaleX = getScaleX();
             const scaleY = getScaleY();
-            
-            endX = (e.clientX - rect.left) * scaleX;
-            endY = (e.clientY - rect.top) * scaleY;
-            drawSelection();
+            const mouseX = (e.clientX - rect.left) * scaleX;
+            const mouseY = (e.clientY - rect.top) * scaleY;
+            if (isMovingSelection) {
+                const centerX = mouseX - dragOffsetX;
+                const centerY = mouseY - dragOffsetY;
+                const width = endX - startX;
+                const height = endY - startY;
+                startX = centerX - width / 2;
+                startY = centerY - height / 2;
+                endX = centerX + width / 2;
+                endY = centerY + height / 2;
+                drawSelection();
+            } else if (isDragging) {
+                endX = mouseX;
+                endY = mouseY;
+                drawSelection();
+            } else if (isInsideHandle(mouseX, mouseY)) {
+                canvas.style.cursor = 'move';
+            } else {
+                canvas.style.cursor = 'crosshair';
+            }
         });
         canvas.addEventListener('mouseup', () => {
             isDragging = false;
+            isMovingSelection = false;
+            canvas.style.cursor = 'crosshair';
         });
         function drawSelection() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(currentImage, 0, 0); 
+            ctx.drawImage(currentImage, 0, 0);
             ctx.beginPath();
             if (cropShape === 'square') {
                 ctx.rect(startX, startY, endX - startX, endY - startY);
@@ -133,6 +180,17 @@
                 ctx.arc(startX, startY, radius, 0, Math.PI * 2);
             }
             ctx.strokeStyle = '#ff0000';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            const centerX = (startX + endX) / 2;
+            const centerY = (startY + endY) / 2;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, handleRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff0000';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
             ctx.stroke();
         }
@@ -140,8 +198,6 @@
             if (!currentImage) return;
             undoHistory.push(canvas.toDataURL());
             redoHistory = [];
-            const scaleX = getScaleX();
-            const scaleY = getScaleY();
             const x = Math.min(startX, endX);
             const y = Math.min(startY, endY);
             const width = Math.abs(endX - startX);
