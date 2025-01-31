@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .container {
+            position: relative;
+            display: inline-block;
+        }
+        canvas {
+            border: 1px solid #ccc;
+        }
+        .shape {
+            position: absolute;
+            border: 2px dashed red;
+            pointer-events: none;
+        }
+        .circle {
+            border-radius: 50%;
+        }
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border: 2px solid red;
+            bottom: -5px;
+            right: -5px;
+            cursor: nwse-resize;
+            pointer-events: all;
+        }
+        .controls {
+            margin: 10px 0;
+        }
+        button {
+            padding: 5px 10px;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <input type="file" id="fileInput" accept="image/*">
+        <button onclick="setMode('circle')">Circle Crop</button>
+        <button onclick="setMode('square')">Square Crop</button>
+        <button onclick="setMode('multi')">Multi-Shape</button>
+        <button onclick="download()">Download</button>
+    </div>
+    <div class="container" id="canvasContainer">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script>
+        let canvas, ctx;
+        let currentMode = null;
+        let shapes = [];
+        let currentShape = null;
+        let isDragging = false;
+        let isResizing = false;
+
+        class Shape {
+            constructor(type, x, y, w, h) {
+                this.type = type;
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+                this.element = this.createDOMElement();
+            }
+
+            createDOMElement() {
+                const div = document.createElement('div');
+                div.className = `shape ${this.type}`;
+                div.style.left = this.x + 'px';
+                div.style.top = this.y + 'px';
+                div.style.width = this.w + 'px';
+                div.style.height = this.h + 'px';
+                
+                const handle = document.createElement('div');
+                handle.className = 'resize-handle';
+                div.appendChild(handle);
+                
+                return div;
+            }
+
+            updatePosition(x, y) {
+                this.x = x;
+                this.y = y;
+                this.element.style.left = x + 'px';
+                this.element.style.top = y + 'px';
+            }
+
+            updateSize(w, h) {
+                this.w = w;
+                this.h = h;
+                this.element.style.width = w + 'px';
+                this.element.style.height = h + 'px';
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'multi') shapes = [];
+            clearShapes();
+        }
+
+        function clearShapes() {
+            document.querySelectorAll('.shape').forEach(el => el.remove());
+            currentShape = null;
+        }
+
+        function handleMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (currentMode && currentMode !== 'multi') {
+                currentShape = new Shape(currentMode, x, y, 0, 0);
+                canvasContainer.appendChild(currentShape.element);
+            } else if (currentMode === 'multi') {
+                currentShape = new Shape('square', x, y, 0, 0);
+                shapes.push(currentShape);
+                canvasContainer.appendChild(currentShape.element);
+            }
+
+            isDragging = true;
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging || !currentShape) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const w = x - currentShape.x;
+            const h = y - currentShape.y;
+
+            currentShape.updateSize(Math.abs(w), Math.abs(h));
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+            currentShape = null;
+        }
+
+        function download() {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            tempCtx.drawImage(canvas, 0, 0);
+
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            for (let y = 0; y < tempCanvas.height; y++) {
+                for (let x = 0; x < tempCanvas.width; x++) {
+                    let keepPixel = false;
+                    const activeShapes = currentMode === 'multi' ? shapes : [currentShape];
+
+                    for (const shape of activeShapes) {
+                        if (!shape) continue;
+                        
+                        if (shape.type === 'circle') {
+                            const centerX = shape.x + shape.w/2;
+                            const centerY = shape.y + shape.h/2;
+                            const radius = shape.w/2;
+                            if (Math.hypot(x - centerX, y - centerY) <= radius) {
+                                keepPixel = true;
+                                break;
+                            }
+                        } else {
+                            if (x >= shape.x && x <= shape.x + shape.w &&
+                                y >= shape.y && y <= shape.y + shape.h) {
+                                keepPixel = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!keepPixel) {
+                        const idx = (y * tempCanvas.width + x) * 4;
+                        data[idx + 3] = 0;
+                    }
+                }
+            }
+
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            const link = document.createElement('a');
+            link.download = 'result.png';
+            link.href = tempCanvas.toDataURL();
+            link.click();
+        }
+
+        // Initialize
+        canvas = document.getElementById('canvas');
+        ctx = canvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvasContainer');
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        canvasContainer.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    </script>
+</body>
+</html>
