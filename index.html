@@ -1,7 +1,8 @@
+<!-- This app was created by Max Warren-->
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Image Cropper</title>
+    <title>MAX</title>
     <style>
         .container {
             max-width: 800px;
@@ -77,12 +78,15 @@
         let cropShape = 'square';
         let isDragging = false;
         let isMovingSelection = false;
+        let isRotating = false;
         let startX, startY, endX, endY;
         let originalWidth, originalHeight;
         let undoHistory = [];
         let redoHistory = [];
         let dragOffsetX, dragOffsetY;
-        let handleRadius = 5;
+        let handleRadius = 15;
+        let rotationAngle = 0;
+        let rotationHandleX, rotationHandleY;
         function getScaleX() {
             return canvas.width / canvas.clientWidth;
         }
@@ -91,12 +95,36 @@
         }
         function setShape(shape) {
             cropShape = shape;
+            rotationAngle = 0;
+            drawSelection();
         }
-        function isInsideHandle(x, y) {
+        function isInsideHandle(x, y, handleX, handleY) {
+            const distance = Math.sqrt((x - handleX) ** 2 + (y - handleY) ** 2);
+            return distance <= handleRadius;
+        }
+        function isInsideCenterHandle(x, y) {
             const centerX = (startX + endX) / 2;
             const centerY = (startY + endY) / 2;
-            const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
-            return distance <= handleRadius;
+            return isInsideHandle(x, y, centerX, centerY);
+        }
+        function isInsideRotationHandle(x, y) {
+            return isInsideHandle(x, y, rotationHandleX, rotationHandleY);
+        }
+        function calculateRotationHandle() {
+            const centerX = (startX + endX) / 2;
+            const centerY = (startY + endY) / 2;
+            const width = endX - startX;
+            const height = endY - startY;
+            const radius = Math.sqrt(width * width + height * height) / 2;
+            rotationHandleX = centerX + Math.sin(rotationAngle) * radius;
+            rotationHandleY = centerY - Math.cos(rotationAngle) * radius;
+        }
+        function rotatePoint(x, y, cx, cy, angle) {
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            const nx = (cos * (x - cx)) + (sin * (y - cy)) + cx;
+            const ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
+            return { x: nx, y: ny };
         }
         document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -113,6 +141,7 @@
                     originalHeight = img.naturalHeight;
                     undoHistory = [canvas.toDataURL()];
                     redoHistory = [];
+                    rotationAngle = 0;
                 };
                 img.src = event.target.result;
             };
@@ -124,8 +153,11 @@
             const scaleY = getScaleY();
             const mouseX = (e.clientX - rect.left) * scaleX;
             const mouseY = (e.clientY - rect.top) * scaleY;
-
-            if (isInsideHandle(mouseX, mouseY)) {
+            calculateRotationHandle();
+            if (isInsideRotationHandle(mouseX, mouseY)) {
+                isRotating = true;
+                canvas.style.cursor = 'grab';
+            } else if (isInsideCenterHandle(mouseX, mouseY)) {
                 isMovingSelection = true;
                 dragOffsetX = mouseX - ((startX + endX) / 2);
                 dragOffsetY = mouseY - ((startY + endY) / 2);
@@ -136,6 +168,7 @@
                 startY = mouseY;
                 endX = mouseX;
                 endY = mouseY;
+                rotationAngle = 0;
             }
         });
         canvas.addEventListener('mousemove', (e) => {
@@ -144,7 +177,13 @@
             const scaleY = getScaleY();
             const mouseX = (e.clientX - rect.left) * scaleX;
             const mouseY = (e.clientY - rect.top) * scaleY;
-            if (isMovingSelection) {
+
+            if (isRotating) {
+                const centerX = (startX + endX) / 2;
+                const centerY = (startY + endY) / 2;
+                rotationAngle = Math.atan2(mouseX - centerX, -(mouseY - centerY));
+                drawSelection();
+            } else if (isMovingSelection) {
                 const centerX = mouseX - dragOffsetX;
                 const centerY = mouseY - dragOffsetY;
                 const width = endX - startX;
@@ -158,20 +197,32 @@
                 endX = mouseX;
                 endY = mouseY;
                 drawSelection();
-            } else if (isInsideHandle(mouseX, mouseY)) {
-                canvas.style.cursor = 'move';
             } else {
-                canvas.style.cursor = 'crosshair';
+                calculateRotationHandle();
+                if (isInsideRotationHandle(mouseX, mouseY)) {
+                    canvas.style.cursor = 'grab';
+                } else if (isInsideCenterHandle(mouseX, mouseY)) {
+                    canvas.style.cursor = 'move';
+                } else {
+                    canvas.style.cursor = 'crosshair';
+                }
             }
         });
         canvas.addEventListener('mouseup', () => {
             isDragging = false;
             isMovingSelection = false;
+            isRotating = false;
             canvas.style.cursor = 'crosshair';
         });
         function drawSelection() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.drawImage(currentImage, 0, 0);
+            const centerX = (startX + endX) / 2;
+            const centerY = (startY + endY) / 2;
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotationAngle);
+            ctx.translate(-centerX, -centerY);
             ctx.beginPath();
             if (cropShape === 'square') {
                 ctx.rect(startX, startY, endX - startX, endY - startY);
@@ -184,8 +235,7 @@
             ctx.fill();
             ctx.lineWidth = 2;
             ctx.stroke();
-            const centerX = (startX + endX) / 2;
-            const centerY = (startY + endY) / 2;
+            ctx.restore();
             ctx.beginPath();
             ctx.arc(centerX, centerY, handleRadius, 0, Math.PI * 2);
             ctx.fillStyle = '#ff0000';
@@ -193,53 +243,68 @@
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 2;
             ctx.stroke();
+            calculateRotationHandle();
+            ctx.beginPath();
+            ctx.arc(rotationHandleX, rotationHandleY, handleRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#00ff00';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(rotationHandleX, rotationHandleY);
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
         function cropImage() {
             if (!currentImage) return;
             undoHistory.push(canvas.toDataURL());
             redoHistory = [];
-            const x = Math.min(startX, endX);
-            const y = Math.min(startY, endY);
-            const width = Math.abs(endX - startX);
-            const height = Math.abs(endY - startY);
-            const radius = Math.sqrt(width ** 2 + height ** 2);
-            const dimensionOption = document.getElementById('dimensionOption').value;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            tempCtx.drawImage(currentImage, 0, 0);
+            tempCtx.save();
+            const centerX = (startX + endX) / 2;
+            const centerY = (startY + endY) / 2;
+            tempCtx.translate(centerX, centerY);
+            tempCtx.rotate(rotationAngle);
+            tempCtx.translate(-centerX, -centerY);
+            tempCtx.beginPath();
+            if (cropShape === 'square') {
+                tempCtx.rect(startX, startY, endX - startX, endY - startY);
+            } else {
+                const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                tempCtx.arc(startX, startY, radius, 0, Math.PI * 2);
+            }
             const cropMode = document.getElementById('cropMode').value;
-            const mergeMode = document.getElementById('mergeMode').value;
-            if (dimensionOption === 'original') {
+            if (cropMode === 'keep') {
+                tempCtx.clip();
+                tempCtx.drawImage(currentImage, 0, 0);
+            } else {
+                tempCtx.fillStyle = '#fff';
+                tempCtx.fill();
+                tempCtx.globalCompositeOperation = 'destination-out';
+                tempCtx.fill();
+            }
+            tempCtx.restore();
+            if (document.getElementById('dimensionOption').value === 'cropped') {
+                const width = Math.abs(endX - startX);
+                const height = Math.abs(endY - startY);
+                const diagonal = Math.sqrt(width * width + height * height);
+                canvas.width = diagonal;
+                canvas.height = diagonal;
+                ctx.save();
+                ctx.translate(diagonal/2, diagonal/2);
+                ctx.rotate(rotationAngle);
+                ctx.translate(-centerX, -centerY);
+                ctx.drawImage(tempCanvas, 0, 0);
+                ctx.restore();
+            } else {
                 canvas.width = originalWidth;
                 canvas.height = originalHeight;
-                if (mergeMode === 'replace') {
-                    ctx.drawImage(originalImage, 0, 0);
-                } else {
-                    ctx.drawImage(currentImage, 0, 0);
-                }
-                ctx.globalCompositeOperation = cropMode === 'keep' ? 'destination-in' : 'destination-out';
-                ctx.beginPath();
-                if (cropShape === 'square') {
-                    ctx.rect(x, y, width, height);
-                } else {
-                    ctx.arc(startX, startY, radius, 0, Math.PI * 2);
-                }
-                ctx.fill();
-                ctx.globalCompositeOperation = 'source-over';
-            } else {
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                if (cropShape === 'square') {
-                    tempCanvas.width = width;
-                    tempCanvas.height = height;
-                    tempCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
-                } else {
-                    tempCanvas.width = radius * 2;
-                    tempCanvas.height = radius * 2;
-                    tempCtx.beginPath();
-                    tempCtx.arc(radius, radius, radius, 0, Math.PI * 2);
-                    tempCtx.clip();
-                    tempCtx.drawImage(currentImage, startX - radius, startY - radius);
-                }
-                canvas.width = tempCanvas.width;
-                canvas.height = tempCanvas.height;
                 ctx.drawImage(tempCanvas, 0, 0);
             }
             currentImage = new Image();
@@ -249,6 +314,7 @@
                 document.getElementById('mergeMode').value = 'add';
                 isFirstCrop = false;
             }
+            rotationAngle = 0;
         }
         function downloadImage() {
             if (!currentImage) return;
@@ -278,6 +344,7 @@
                 canvas.height = img.naturalHeight;
                 ctx.drawImage(img, 0, 0);
                 currentImage = img;
+                rotationAngle = 0;
             };
             img.src = dataURL;
         }
