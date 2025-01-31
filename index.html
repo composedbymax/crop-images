@@ -5,7 +5,7 @@
     <style>
         .container {
             max-width: 800px;
-            margin: 0 auto;
+            margin: 20px auto;
             text-align: center;
         }
         #preview {
@@ -35,6 +35,10 @@
                 <select id="dimensionOption">
                     <option value="original">Original Dimensions</option>
                     <option value="cropped">Cropped Dimensions</option>
+                </select>
+                <select id="cropMode">
+                    <option value="keep">Keep Selection</option>
+                    <option value="remove">Remove Selection</option>
                 </select>
                 <button onclick="cropImage()">Crop</button>
                 <button onclick="downloadImage()">Download</button>
@@ -116,11 +120,13 @@
             const height = Math.abs(endY - startY);
             const radius = Math.sqrt(width ** 2 + height ** 2);
             const dimensionOption = document.getElementById('dimensionOption').value;
+            const cropMode = document.getElementById('cropMode').value;
+
             if (dimensionOption === 'original') {
                 canvas.width = originalWidth;
                 canvas.height = originalHeight;
                 ctx.drawImage(originalImage, 0, 0);
-                ctx.globalCompositeOperation = 'destination-in';
+                ctx.globalCompositeOperation = cropMode === 'keep' ? 'destination-in' : 'destination-out';
                 ctx.beginPath();
                 if (cropShape === 'square') {
                     ctx.rect(x, y, width, height);
