@@ -1,222 +1,156 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Image Cropper</title>
     <style>
         .container {
-            position: relative;
-            display: inline-block;
+            max-width: 800px;
+            margin: 20px auto;
+            text-align: center;
         }
-        canvas {
+        #preview {
             border: 1px solid #ccc;
+            margin: 20px 0;
         }
-        .shape {
-            position: absolute;
-            border: 2px dashed red;
-            pointer-events: none;
-        }
-        .circle {
-            border-radius: 50%;
-        }
-        .resize-handle {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background: white;
-            border: 2px solid red;
-            bottom: -5px;
-            right: -5px;
-            cursor: nwse-resize;
-            pointer-events: all;
-        }
-        .controls {
+        .toolbar {
             margin: 10px 0;
         }
         button {
-            padding: 5px 10px;
+            padding: 8px 16px;
             margin: 0 5px;
+            cursor: pointer;
+        }
+        .shape-selector {
+            margin-bottom: 10px;
+        }
+        .download-options {
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="controls">
-        <input type="file" id="fileInput" accept="image/*">
-        <button onclick="setMode('circle')">Circle Crop</button>
-        <button onclick="setMode('square')">Square Crop</button>
-        <button onclick="setMode('multi')">Multi-Shape</button>
-        <button onclick="download()">Download</button>
+    <div class="container">
+        <input type="file" id="imageInput" accept="image/*">
+        <div class="toolbar">
+            <div class="shape-selector">
+                <button onclick="setShape('square')">Square</button>
+                <button onclick="setShape('circle')">Circle</button>
+            </div>
+            <button onclick="cropImage()">Crop</button>
+            <div class="download-options">
+                <button onclick="downloadImage()">Download</button>
+                <select id="dimensionOption">
+                    <option value="original">Original Dimensions</option>
+                    <option value="cropped">Cropped Dimensions</option>
+                </select>
+            </div>
+        </div>
+        <canvas id="preview"></canvas>
     </div>
-    <div class="container" id="canvasContainer">
-        <canvas id="canvas"></canvas>
-    </div>
-
     <script>
-        let canvas, ctx;
-        let currentMode = null;
-        let shapes = [];
-        let currentShape = null;
+        let canvas = document.getElementById('preview');
+        let ctx = canvas.getContext('2d');
+        let currentImage = null;
+        let cropShape = 'square';
         let isDragging = false;
-        let isResizing = false;
-
-        class Shape {
-            constructor(type, x, y, w, h) {
-                this.type = type;
-                this.x = x;
-                this.y = y;
-                this.w = w;
-                this.h = h;
-                this.element = this.createDOMElement();
-            }
-
-            createDOMElement() {
-                const div = document.createElement('div');
-                div.className = `shape ${this.type}`;
-                div.style.left = this.x + 'px';
-                div.style.top = this.y + 'px';
-                div.style.width = this.w + 'px';
-                div.style.height = this.h + 'px';
-                
-                const handle = document.createElement('div');
-                handle.className = 'resize-handle';
-                div.appendChild(handle);
-                
-                return div;
-            }
-
-            updatePosition(x, y) {
-                this.x = x;
-                this.y = y;
-                this.element.style.left = x + 'px';
-                this.element.style.top = y + 'px';
-            }
-
-            updateSize(w, h) {
-                this.w = w;
-                this.h = h;
-                this.element.style.width = w + 'px';
-                this.element.style.height = h + 'px';
-            }
+        let startX, startY, endX, endY;
+        function setShape(shape) {
+            cropShape = shape;
         }
-
-        function setMode(mode) {
-            currentMode = mode;
-            if (mode === 'multi') shapes = [];
-            clearShapes();
-        }
-
-        function clearShapes() {
-            document.querySelectorAll('.shape').forEach(el => el.remove());
-            currentShape = null;
-        }
-
-        function handleMouseDown(e) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            if (currentMode && currentMode !== 'multi') {
-                currentShape = new Shape(currentMode, x, y, 0, 0);
-                canvasContainer.appendChild(currentShape.element);
-            } else if (currentMode === 'multi') {
-                currentShape = new Shape('square', x, y, 0, 0);
-                shapes.push(currentShape);
-                canvasContainer.appendChild(currentShape.element);
-            }
-
-            isDragging = true;
-        }
-
-        function handleMouseMove(e) {
-            if (!isDragging || !currentShape) return;
-
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            const w = x - currentShape.x;
-            const h = y - currentShape.y;
-
-            currentShape.updateSize(Math.abs(w), Math.abs(h));
-        }
-
-        function handleMouseUp() {
-            isDragging = false;
-            currentShape = null;
-        }
-
-        function download() {
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCanvas.width = canvas.width;
-            tempCanvas.height = canvas.height;
-            tempCtx.drawImage(canvas, 0, 0);
-
-            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
-            const data = imageData.data;
-
-            for (let y = 0; y < tempCanvas.height; y++) {
-                for (let x = 0; x < tempCanvas.width; x++) {
-                    let keepPixel = false;
-                    const activeShapes = currentMode === 'multi' ? shapes : [currentShape];
-
-                    for (const shape of activeShapes) {
-                        if (!shape) continue;
-                        
-                        if (shape.type === 'circle') {
-                            const centerX = shape.x + shape.w/2;
-                            const centerY = shape.y + shape.h/2;
-                            const radius = shape.w/2;
-                            if (Math.hypot(x - centerX, y - centerY) <= radius) {
-                                keepPixel = true;
-                                break;
-                            }
-                        } else {
-                            if (x >= shape.x && x <= shape.x + shape.w &&
-                                y >= shape.y && y <= shape.y + shape.h) {
-                                keepPixel = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!keepPixel) {
-                        const idx = (y * tempCanvas.width + x) * 4;
-                        data[idx + 3] = 0;
-                    }
-                }
-            }
-
-            tempCtx.putImageData(imageData, 0, 0);
-            
-            const link = document.createElement('a');
-            link.download = 'result.png';
-            link.href = tempCanvas.toDataURL();
-            link.click();
-        }
-
-        // Initialize
-        canvas = document.getElementById('canvas');
-        ctx = canvas.getContext('2d');
-        const canvasContainer = document.getElementById('canvasContainer');
-
-        document.getElementById('fileInput').addEventListener('change', function(e) {
+        document.getElementById('imageInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             const reader = new FileReader();
-
             reader.onload = function(event) {
                 const img = new Image();
                 img.onload = function() {
                     canvas.width = img.width;
                     canvas.height = img.height;
                     ctx.drawImage(img, 0, 0);
+                    currentImage = img;
                 };
                 img.src = event.target.result;
             };
             reader.readAsDataURL(file);
         });
-
-        canvasContainer.addEventListener('mousedown', handleMouseDown);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.offsetX;
+            startY = e.offsetY;
+        });
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            endX = e.offsetX;
+            endY = e.offsetY;
+            drawSelection();
+        });
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+        function drawSelection() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(currentImage, 0, 0);
+            ctx.beginPath();
+            if (cropShape === 'square') {
+                ctx.rect(startX, startY, endX - startX, endY - startY);
+            } else {
+                const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                ctx.arc(startX, startY, radius, 0, Math.PI * 2);
+            }
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        function cropImage() {
+            if (!currentImage) return;
+            const x = startX;
+            const y = startY;
+            const width = endX - startX;
+            const height = endY - startY;
+            const radius = Math.sqrt(width ** 2 + height ** 2);
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            if (cropShape === 'square') {
+                tempCanvas.width = Math.abs(width);
+                tempCanvas.height = Math.abs(height);
+                tempCtx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
+            } else {
+                tempCanvas.width = radius * 2;
+                tempCanvas.height = radius * 2;
+                tempCtx.save();
+                tempCtx.beginPath();
+                tempCtx.arc(radius, radius, radius, 0, Math.PI * 2);
+                tempCtx.clip();
+                tempCtx.drawImage(currentImage, x - radius, y - radius);
+                tempCtx.restore();
+            }
+            canvas.width = tempCanvas.width;
+            canvas.height = tempCanvas.height;
+            ctx.drawImage(tempCanvas, 0, 0);
+            currentImage = new Image();
+            currentImage.src = canvas.toDataURL();
+        }
+        function downloadImage() {
+            if (!currentImage) return;
+            const option = document.getElementById('dimensionOption').value;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            if (option === 'original') {
+                tempCanvas.width = currentImage.width;
+                tempCanvas.height = currentImage.height;
+                tempCtx.drawImage(canvas, 
+                    (currentImage.width - canvas.width) / 2,
+                    (currentImage.height - canvas.height) / 2
+                );
+            } else {
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                tempCtx.drawImage(canvas, 0, 0);
+            }
+            const link = document.createElement('a');
+            link.download = 'cropped-image.png';
+            link.href = tempCanvas.toDataURL();
+            link.click();
+        }
     </script>
 </body>
 </html>
