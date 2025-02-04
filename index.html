@@ -1,75 +1,156 @@
+<!-- Created by MAx Warren-->
 <!DOCTYPE html>
 <html>
 <head>
     <title>MAX</title>
     <style>
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height:100vh;
+        }
         .container {
-            max-width: 800px;
+            max-width: 90%;
             margin: 20px auto;
             text-align: center;
             display: flex;
             flex-direction: column;
             align-items: center;
+            background: white;
+            padding: 10px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
         }
         #preview {
-            border: 1px solid #ccc;
+            border: 2px dashed #ddd;
             margin: 20px 0;
             max-width: 100%;
             max-height: 70vh;
+            min-height:50vh;
             width: auto;
             height: auto;
             cursor: crosshair;
+            border-radius: 10px;
+            transition: border-color 0.3s;
         }
         .toolbar {
             margin: 10px 0;
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         button {
-            padding: 8px 16px;
+            padding: 10px 20px;
             margin: 0 5px;
             cursor: pointer;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 14px;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        button:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
         button.active {
-            background-color: #4CAF50;
-            color: white;
+            background: #2196F3;
         }
         .button-group {
-            display: inline-block;
-            margin: 0 5px;
+            display: inline-flex;
+            background: #f0f0f0;
+            border-radius: 25px;
+            padding: 5px;
         }
         .button-group button {
             margin: 0;
-            border-radius: 0;
+            border-radius: 20px;
+            background: transparent;
+            color: #666;
         }
-        .button-group button:first-child {
-            border-radius: 4px 0 0 4px;
-        }
-        .button-group button:last-child {
-            border-radius: 0 4px 4px 0;
+        .button-group button.active {
+            background: #2196F3;
+            color: white;
         }
         .controls {
-            margin-bottom: 10px;
+            margin-bottom: 20px;
+            width: 100%;
         }
         canvas {
-            background-image: linear-gradient(45deg, #ddd 25%, transparent 25%),
-            linear-gradient(-45deg, #ddd 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #ddd 75%),
-            linear-gradient(-45deg, transparent 75%, #ddd 75%);
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
+                            linear-gradient(-45deg, #eee 25%, transparent 25%),
+                            linear-gradient(45deg, transparent 75%, #eee 75%),
+                            linear-gradient(-45deg, transparent 75%, #eee 75%);
             background-size: 20px 20px;
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
         button:disabled {
-            background-color: #ccc;
+            background: #ccc;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .drop-zone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            color: #666;
+            border: 4px dashed #4CAF50;
+            z-index: 1000;
+        }
+        .drop-zone.active {
+            display: flex;
+        }
+        .custom-file-input {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            cursor:pointer;
+        }
+        .custom-file-input input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
 <body>
+    <div class="drop-zone">Drop image here</div>
     <div class="container">
-        <input type="file" id="imageInput" accept="image/*">
         <div class="controls">
             <div class="toolbar">
-                <button onclick="setShape('square')">Square</button>
-                <button onclick="setShape('circle')">Circle</button>
+                <div class="custom-file-input">
+                    <button>Upload Image</button>
+                    <input type="file" id="imageInput" accept="image/*">
+                </div>
+                <button onclick="downloadImage()">Download</button>
+                <button onclick="undo()">Undo</button>
+                <button onclick="redo()">Redo</button>
+                <button onclick="cropImage()">Crop</button>
+            </div>
+        </div>
+        <div class="controls">
+            <div class="toolbar">
+                <div class="button-group">
+                    <button onclick="setShape('square')">Square</button>
+                    <button onclick="setShape('circle')">Circle</button>
+                </div>
                 <div class="button-group">
                     <button onclick="setDimensionOption('original')" class="active">Original</button>
                     <button onclick="setDimensionOption('cropped')">Cropped</button>
@@ -78,10 +159,6 @@
                     <button id="removeButton" onclick="setCropMode('remove')" class="active">Remove</button>
                     <button id="keepButton" onclick="setCropMode('keep')">Keep</button>
                 </div>
-                <button onclick="cropImage()">Crop</button>
-                <button onclick="downloadImage()">Download</button>
-                <button onclick="undo()">Undo</button>
-                <button onclick="redo()">Redo</button>
             </div>
         </div>
         <canvas id="preview"></canvas>
@@ -166,8 +243,25 @@
             const ny = (cos * (y - cy)) - (sin * (x - cx)) + cy;
             return { x: nx, y: ny };
         }
-        document.getElementById('imageInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
+        const dropZone = document.querySelector('.drop-zone');
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('active');
+        });
+        document.addEventListener('dragleave', (e) => {
+            if (e.relatedTarget === null) {
+                dropZone.classList.remove('active');
+            }
+        });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('active');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleImageFile(file);
+            }
+        });
+        function handleImageFile(file) {
             const reader = new FileReader();
             reader.onload = function(event) {
                 const img = new Image();
@@ -186,6 +280,10 @@
                 img.src = event.target.result;
             };
             reader.readAsDataURL(file);
+        }
+        document.getElementById('imageInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) handleImageFile(file);
         });
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
