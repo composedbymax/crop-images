@@ -1,4 +1,3 @@
-<!-- This app was created by Max Warren-->
 <!DOCTYPE html>
 <html>
 <head>
@@ -58,6 +57,10 @@
             background-size: 20px 20px;
             background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -72,8 +75,8 @@
                     <button onclick="setDimensionOption('cropped')">Cropped</button>
                 </div>
                 <div class="button-group">
-                    <button onclick="setCropMode('keep')">Keep</button>
-                    <button onclick="setCropMode('remove')" class="active">Remove</button>
+                    <button id="removeButton" onclick="setCropMode('remove')" class="active">Remove</button>
+                    <button id="keepButton" onclick="setCropMode('keep')">Keep</button>
                 </div>
                 <button onclick="cropImage()">Crop</button>
                 <button onclick="downloadImage()">Download</button>
@@ -108,6 +111,15 @@
             document.querySelectorAll('[onclick^="setDimensionOption"]').forEach(btn => {
                 btn.classList.toggle('active', btn.textContent.toLowerCase() === option);
             });
+            if (option === 'original') {
+                setCropMode('remove');
+                document.getElementById('removeButton').disabled = false;
+                document.getElementById('keepButton').disabled = false;
+            } else if (option === 'cropped') {
+                setCropMode('keep');
+                document.getElementById('removeButton').disabled = true;
+                document.getElementById('keepButton').disabled = false;
+            }
         }
         function setCropMode(mode) {
             selectedCropMode = mode;
