@@ -29,6 +29,24 @@
             margin: 0 5px;
             cursor: pointer;
         }
+        button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .button-group {
+            display: inline-block;
+            margin: 0 5px;
+        }
+        .button-group button {
+            margin: 0;
+            border-radius: 0;
+        }
+        .button-group button:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        .button-group button:last-child {
+            border-radius: 0 4px 4px 0;
+        }
         .controls {
             margin-bottom: 10px;
         }
@@ -49,18 +67,14 @@
             <div class="toolbar">
                 <button onclick="setShape('square')">Square</button>
                 <button onclick="setShape('circle')">Circle</button>
-                <select id="dimensionOption">
-                    <option value="original">Original Dimensions</option>
-                    <option value="cropped">Cropped Dimensions</option>
-                </select>
-                <select id="cropMode">
-                    <option value="keep">Keep Selection</option>
-                    <option value="remove">Remove Selection</option>
-                </select>
-                <select id="mergeMode">
-                    <option value="replace">Replace</option>
-                    <option value="add">Add</option>
-                </select>
+                <div class="button-group">
+                    <button onclick="setDimensionOption('original')" class="active">Original</button>
+                    <button onclick="setDimensionOption('cropped')">Cropped</button>
+                </div>
+                <div class="button-group">
+                    <button onclick="setCropMode('keep')">Keep</button>
+                    <button onclick="setCropMode('remove')" class="active">Remove</button>
+                </div>
                 <button onclick="cropImage()">Crop</button>
                 <button onclick="downloadImage()">Download</button>
                 <button onclick="undo()">Undo</button>
@@ -87,6 +101,20 @@
         let handleRadius = 15;
         let rotationAngle = 0;
         let rotationHandleX, rotationHandleY;
+        let selectedDimensionOption = 'original';
+        let selectedCropMode = 'remove';
+        function setDimensionOption(option) {
+            selectedDimensionOption = option;
+            document.querySelectorAll('[onclick^="setDimensionOption"]').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === option);
+            });
+        }
+        function setCropMode(mode) {
+            selectedCropMode = mode;
+            document.querySelectorAll('[onclick^="setCropMode"]').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent.toLowerCase() === mode);
+            });
+        }
         function getScaleX() {
             return canvas.width / canvas.clientWidth;
         }
@@ -278,7 +306,7 @@
                 const radius = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
                 tempCtx.arc(startX, startY, radius, 0, Math.PI * 2);
             }
-            const cropMode = document.getElementById('cropMode').value;
+            const cropMode = selectedCropMode;
             if (cropMode === 'keep') {
                 tempCtx.clip();
                 tempCtx.drawImage(currentImage, 0, 0);
@@ -289,7 +317,7 @@
                 tempCtx.fill();
             }
             tempCtx.restore();
-            if (document.getElementById('dimensionOption').value === 'cropped') {
+            if (selectedDimensionOption === 'cropped') {
                 const width = Math.abs(endX - startX);
                 const height = Math.abs(endY - startY);
                 canvas.width = width;
@@ -310,8 +338,7 @@
             currentImage = new Image();
             currentImage.src = canvas.toDataURL();
             if (isFirstCrop) {
-                document.getElementById('cropMode').value = 'remove';
-                document.getElementById('mergeMode').value = 'add';
+                setCropMode('remove');
                 isFirstCrop = false;
             }
             rotationAngle = 0;
