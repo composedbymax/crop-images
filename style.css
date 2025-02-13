@@ -1,0 +1,126 @@
+body {
+    background: var(--gradient2);
+    min-height:100vh;
+}
+.push {
+    margin-top:4rem;
+}
+.container {
+    margin-top:12rem;
+    max-width: 90%;
+    margin: 20px auto;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: var(--dark);
+    padding: 10px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    position: relative;
+}
+#preview {
+    border: 2px dashed var(--text);
+    margin: 20px 0;
+    max-width: 100%;
+    max-height: 70vh;
+    min-height:50vh;
+    width: auto;
+    height: auto;
+    cursor: crosshair;
+    border-radius: 10px;
+    transition: border-color 0.3s;
+}
+.toolbar {
+    margin: 10px 0;
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+button {
+    padding: 10px 20px;
+    margin: 0 5px;
+    cursor: pointer;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 25px;
+    font-size: 14px;
+    transition: all 0.3s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+button:hover {
+    background: var(--accenth);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+button.active {
+    background: var(--accent);
+}
+.button-group {
+    display: inline-flex;
+    background: var(--dark1);
+    border-radius: 25px;
+    padding: 5px;
+}
+.button-group button {
+    margin: 0;
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text);
+}
+.button-group button.active {
+    background: var(--accent);
+}
+.controls {
+    margin-bottom: 20px;
+    width: 100%;
+}
+canvas {
+    background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
+                    linear-gradient(-45deg, #eee 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #eee 75%),
+                    linear-gradient(-45deg, transparent 75%, #eee 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+.drop-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    color: #fff;
+    border: 4px dashed var(--accent);
+    z-index: 1000;
+}
+.drop-zone.active {
+    display: flex;
+}
+.custom-file-input {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    cursor:pointer;
+}
+.custom-file-input input[type="file"] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+}
