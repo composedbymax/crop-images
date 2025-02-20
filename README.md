@@ -43,7 +43,7 @@ An intuitive and powerful image cropping tool built for efficient and precise ed
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/image-cropper.git
+    git clone https://github.com/composedbymax/crop-images.git
     ```
 2. Open `index.html` in your browser.
 3. Start cropping your images!
